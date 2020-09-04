@@ -145,57 +145,57 @@ optimizer = optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 record = []
 weights = []
 
-# for epoch in range(num_epochs):
-#
-#     train_rights = []
-#
-#     for batch_idx, (data, target) in enumerate(train_loader):
-#         if torch.cuda.is_available():
-#             data, target = Variable(data).cuda(), Variable(target).cuda()
-#         else:
-#             data, target = Variable(data), Variable(target)
-#         net.train()
-#         output = net(data)
-#         loss = criterion(output, target)
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-#         right = rightness(output, target)
-#         train_rights.append(right)
-#
-#
-#         if batch_idx % 100 == 0:
-#             net.eval()
-#             val_rights = []
-#
-#             for(data, target) in validation_loader:
-#                 if torch.cuda.is_available():
-#                     data, target = Variable(data).cuda(), Variable(target).cuda()
-#                 else:
-#                     data, target = Variable(data), Variable(target)
-#                 output = net(data)
-#                 right = rightness(output, target)
-#                 val_rights.append(right)
-#
-#             train_r = (sum([tup[0] for tup in train_rights]), sum([tup[1] for tup in train_rights]))
-#             val_r = (sum([tup[0] for tup in val_rights]), sum([tup[1] for tup in val_rights]))
-#             print('训练周期:{} [{}/{} ({:.0f}%)]\t, loss: {:.6f}\t, 训练正确率: {:.2f}%\t,'
-#                   '校验正确率：{:.2f}%'.format(
-#                 epoch, batch_idx * len(data), len(train_loader.dataset),
-#                 100. * batch_idx / len(train_loader), loss.item(),
-#                 100. * train_r[0] / train_r[1],
-#                 100. * val_r[0] / val_r[1]
-#             ))
-#
-#             record.append((100 - 100. * train_r[0] / train_r[1], 100 - 100. * val_r[0]/val_r[1]))
-#
-#             weights.append([net.conv1.weight.data.clone(), net.conv1.bias.data.clone(),
-#                             net.conv2.weight.data.clone(), net.conv2.bias.data.clone()])
+for epoch in range(num_epochs):
+
+    train_rights = []
+
+    for batch_idx, (data, target) in enumerate(train_loader):
+        if torch.cuda.is_available():
+            data, target = Variable(data).cuda(), Variable(target).cuda()
+        else:
+            data, target = Variable(data), Variable(target)
+        net.train()
+        output = net(data)
+        loss = criterion(output, target)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        right = rightness(output, target)
+        train_rights.append(right)
+
+
+        if batch_idx % 100 == 0:
+            net.eval()
+            val_rights = []
+
+            for(data, target) in validation_loader:
+                if torch.cuda.is_available():
+                    data, target = Variable(data).cuda(), Variable(target).cuda()
+                else:
+                    data, target = Variable(data), Variable(target)
+                output = net(data)
+                right = rightness(output, target)
+                val_rights.append(right)
+
+            train_r = (sum([tup[0] for tup in train_rights]), sum([tup[1] for tup in train_rights]))
+            val_r = (sum([tup[0] for tup in val_rights]), sum([tup[1] for tup in val_rights]))
+            print('训练周期:{} [{}/{} ({:.0f}%)]\t, loss: {:.6f}\t, 训练正确率: {:.2f}%\t,'
+                  '校验正确率：{:.2f}%'.format(
+                epoch, batch_idx * len(data), len(train_loader.dataset),
+                100. * batch_idx / len(train_loader), loss.item(),
+                100. * train_r[0] / train_r[1],
+                100. * val_r[0] / val_r[1]
+            ))
+
+            record.append((100 - 100. * train_r[0] / train_r[1], 100 - 100. * val_r[0]/val_r[1]))
+
+            weights.append([net.conv1.weight.data.clone(), net.conv1.bias.data.clone(),
+                            net.conv2.weight.data.clone(), net.conv2.bias.data.clone()])
 
 
 # 测试模型
-# torch.save(net,'./save_model/cnn_model.mdl')
-net = torch.load('./save_model/cnn_model.mdl')
+torch.save(net,'./save_model/cnn_model.mdl')
+# net = torch.load('./save_model/cnn_model.mdl')
 # print('保存完毕')
 net.eval()
 vals = []
@@ -221,3 +221,74 @@ plt.plot(record)
 plt.xlabel('Steps')
 plt.ylabel('Error rate')
 plt.show()
+
+
+#提取第一层卷积层的卷积核
+
+plt.figure(figsize=(10, 7))
+for i in range(4):
+    plt.subplot(1, 4, i+1)
+    plt.imshow(net.conv1.weight.data.numpy()[i,0,...])
+
+# 调用net的retrieve_features方法可以抽取输入当前数据后输出的所有特征图（第一个卷积层和第二个卷积层）
+# 首先定义读入的图片，它是从test_dataset中提取第idx个批次的第0个图
+
+# 其次unsqueeze的作用时在最前面添加一维
+# 目的是让这个input_x的tensor是四维的，这样才能输入给net。补充的那一维表示batch
+input_x = test_dataset[idx][0].unsqueeze(0)
+# feature_maps是有两个元素的列表，分别表示第一层和第二层卷积的所有特征图
+feature_maps = net.retrieve_features(Variable(input_x))
+
+plt.figure(figsize=(10, 7))
+
+for i in range(4):
+    plt.subplot(1, 4, i+1)
+    plt.imshow(feature_maps[0][0, i, ...].data.numpy())
+
+
+# 绘制第二层的卷积核，每一列对应一个卷积核，一共有8个卷积核
+
+plt.figure(figsize=(15, 10))
+for i in range(4):
+    for j in range(8):
+        plt.subplot(4, 8, i * 8 + j + 1)
+        plt.imshow(net.conv2.weight.data.numpy()[j, i,...])
+
+# 绘制第二层的特征图，一共有8个
+plt.figure(figsize=(10, 7))
+for i in range(8):
+    plt.subplot(2,4,i+1)
+    plt.imshow(feature_maps[1][0, i, ...].data.numpy())
+
+
+
+# 卷积神经网络的健壮性实验
+
+a = test_dataset[idx][0][0]
+
+b = torch.zeros(a.size())
+
+for i in range(a.size()[0]):
+    for j in range(0, a.size()[1] - w):
+        b[i, j] = a[i, j+w]
+
+muteimg = b.numpy()
+plt.imshow(muteimg)
+
+
+prediction = net(Variable(b.unsqueeze(0).unsqueeze(0)))
+pred = torch.max(prediction.data, 1)[1]
+print(pred)
+
+
+feature_maps = net.retrieve_features(Variable(b.unsqueeze(0).unsqueeze(0)))
+
+plt.figure(figsize=(10, 7))
+for i in range(4):
+    plt.subplot(1,4,i+1)
+    plt.imshow(feature_maps[0][0, i,...].data.numpy())
+
+plt.figure(figsize=(10, 7))
+for i in range(8):
+    plt.subplot(2,4,i + 1)
+    plt.imshow(feature_maps[1][0, i, ...].data.numpy())
